@@ -9,24 +9,16 @@ import com.google.common.collect.Sets;
 import me.hao0.antares.common.dto.*;
 import me.hao0.antares.common.log.Logs;
 import me.hao0.antares.common.model.*;
-import me.hao0.antares.common.model.enums.JobInstanceShardStatus;
-import me.hao0.antares.common.model.enums.JobInstanceStatus;
-import me.hao0.antares.common.model.enums.JobState;
-import me.hao0.antares.common.model.enums.JobStatus;
-import me.hao0.antares.common.model.enums.JobType;
-import me.hao0.antares.common.model.enums.ShardOperateRespCode;
-import me.hao0.antares.common.util.CollectionUtil;
-import me.hao0.antares.common.util.Constants;
-import me.hao0.antares.common.util.Executors;
-import me.hao0.antares.common.util.Systems;
+import me.hao0.antares.common.model.enums.*;
+import me.hao0.antares.common.util.*;
 import me.hao0.antares.store.dao.*;
 import me.hao0.antares.store.exception.JobInstanceNotExistException;
 import me.hao0.antares.store.exception.JobNotExistException;
 import me.hao0.antares.store.exception.ShardOperateException;
 import me.hao0.antares.store.manager.JobConfigManager;
-import me.hao0.antares.store.manager.JobManager;
 import me.hao0.antares.store.manager.JobInstanceManager;
 import me.hao0.antares.store.manager.JobInstanceShardManager;
+import me.hao0.antares.store.manager.JobManager;
 import me.hao0.antares.store.service.AppService;
 import me.hao0.antares.store.service.ClusterService;
 import me.hao0.antares.store.service.JobService;
@@ -34,9 +26,9 @@ import me.hao0.antares.store.support.JobSupport;
 import me.hao0.antares.store.util.Dates;
 import me.hao0.antares.store.util.Page;
 import me.hao0.antares.store.util.Paging;
-import me.hao0.antares.common.util.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 
@@ -48,65 +40,37 @@ import java.util.concurrent.ExecutorService;
 @Service
 public class JobServiceImpl implements JobService {
 
-    @Autowired
-    private JobDao jobDao;
-
-    @Autowired
-    private JobInstanceDao jobInstanceDao;
-
-    @Autowired
-    private JobConfigDao jobConfigDao;
-
-    @Autowired
-    private JobServerDao jobServerDao;
-
-    @Autowired
-    private JobInstanceShardDao jobInstanceShardDao;
-
-    @Autowired
-    private JobDependenceDao jobDependenceDao;
-
-    @Autowired
-    private JobAssignDao jobAssignDao;
-
-    @Autowired
-    private JobManager jobManager;
-
-    @Autowired
-    private JobConfigManager jobConfigManager;
-
-    @Autowired
-    private JobInstanceManager jobInstanceManager;
-
-    @Autowired
-    private JobInstanceShardManager jobInstanceShardManager;
-
-    @Autowired
-    private AppService appService;
-
-    @Autowired
-    private ClusterService clusterService;
-
-    @Autowired
-    private JobSupport jobSupport;
-
     private final ExecutorService executor = Executors.newExecutor(Systems.cpuNum(), 10000, "JOB-SERVER-WORKER-");
-
     private static final String JOB_ASSIGN_EMPTY_PLACE_HOLDER = "-1";
+
+    private JobInstanceShardManager jobInstanceShardManager;
+    private JobInstanceShardDao jobInstanceShardDao;
+    private JobInstanceManager jobInstanceManager;
+    private JobConfigManager jobConfigManager;
+    private JobDependenceDao jobDependenceDao;
+    private JobInstanceDao jobInstanceDao;
+    private ClusterService clusterService;
+    private JobConfigDao jobConfigDao;
+    private JobServerDao jobServerDao;
+    private JobAssignDao jobAssignDao;
+    private JobManager jobManager;
+    private JobSupport jobSupport;
+    private AppService appService;
+    private JobDao jobDao;
 
     @Override
     public Response<Long> saveJob(JobEditDto editing) {
         try {
             JobDetail jobDetail = buildJobDetail(editing);
             Response<Long> saveResp = saveJobDetail(jobDetail);
-            if (!saveResp.isSuccess()){
+            if (!saveResp.isOk()) {
                 return Response.notOk(saveResp.getErr());
             }
             return Response.ok(saveResp.getData());
-        } catch (JobNotExistException e){
+        } catch (JobNotExistException e) {
             Logs.warn("The job(id={}) doesn't exist when save job.", e.getId());
             return Response.notOk("job.not.exist");
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to save job dto({}), cause: {}",
                     editing, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.save.failed");
@@ -120,7 +84,7 @@ public class JobServiceImpl implements JobService {
         JobConfig config;
 
         Job job = jobDao.findByJobClass(editing.getAppId(), editing.getClazz());
-        if (job == null){
+        if (job == null) {
 
             // create
             job = new Job();
@@ -164,22 +128,22 @@ public class JobServiceImpl implements JobService {
     public Response<Long> saveJobDetail(JobDetail jobDetail) {
         try {
             Job job = jobDetail.getJob();
-            if (jobManager.save(job)){
+            if (jobManager.save(job)) {
                 JobConfig config = jobDetail.getConfig();
                 config.setJobId(job.getId());
-                if (jobConfigManager.save(config)){
+                if (jobConfigManager.save(config)) {
                     return Response.ok(job.getId());
                 } else {
                     // try to rollback the dirty job
-                    if (!jobManager.delete(job.getId())){
+                    if (!jobManager.delete(job.getId())) {
                         Logs.error("failed to rollback job({}) when save job detail.", job);
                     }
                 }
             }
             return Response.ok(job.getId());
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to save job detail({}), cause: {}",
-                            jobDetail, Throwables.getStackTraceAsString(e));
+                    jobDetail, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.save.failed");
         }
     }
@@ -187,7 +151,7 @@ public class JobServiceImpl implements JobService {
     @Override
     public Response<Boolean> deleteJob(final Long jobId) {
         try {
-            if (jobManager.delete(jobId)){
+            if (jobManager.delete(jobId)) {
 
                 executor.submit(new Runnable() {
                     @Override
@@ -197,7 +161,7 @@ public class JobServiceImpl implements JobService {
                             jobConfigManager.deleteByJobId(jobId);
                             jobInstanceManager.deleteByJobId(jobId);
                             jobServerDao.unbindJob(jobId);
-                        } catch (Exception e){
+                        } catch (Exception e) {
                             Logs.error("failed to delete the job(id={})'s config and instance data.", jobId);
                         }
                     }
@@ -206,7 +170,7 @@ public class JobServiceImpl implements JobService {
                 return Response.ok(true);
             }
             return Response.ok(false);
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to delete job(jobId={}), cause: {}",
                     jobId, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.delete.failed");
@@ -217,7 +181,7 @@ public class JobServiceImpl implements JobService {
     public Response<Job> findJobById(Long jobId) {
         try {
             return Response.ok(jobDao.findById(jobId));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to find job(jobId={}), cause: {}",
                     jobId, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.find.failed");
@@ -228,21 +192,21 @@ public class JobServiceImpl implements JobService {
     public Response<JobDetail> findJobDetailById(Long jobId) {
         try {
             return Response.ok(findJobDetail(jobId, null));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to find job detail(jobId={}), cause: {}",
                     jobId, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.find.failed");
         }
     }
 
-    private JobDetail findJobDetail(Long jobId, JobStatus filterStatus){
+    private JobDetail findJobDetail(Long jobId, JobStatus filterStatus) {
         Job job = jobDao.findById(jobId);
-        if (job == null){
+        if (job == null) {
             return null;
         }
 
-        if (filterStatus != null){
-            if (!Objects.equal(job.getStatus(), filterStatus.value())){
+        if (filterStatus != null) {
+            if (!Objects.equal(job.getStatus(), filterStatus.value())) {
                 return null;
             }
         }
@@ -264,9 +228,18 @@ public class JobServiceImpl implements JobService {
         try {
 
             // find by the job class full name
-            if (!Strings.isNullOrEmpty(jobClass)){
-                Job job = jobDao.findByJobClass(appId, jobClass);
-                if (job == null){
+            if (!Strings.isNullOrEmpty(jobClass)) {
+
+                Job job;
+
+                // it's a job ID
+                if (jobClass.matches("\\d+")) {
+                    job = jobDao.findById(Long.parseLong(jobClass));
+                } else {
+                    job = jobDao.findByJobClass(appId, jobClass);
+                }
+
+                if (job == null) {
                     return Response.ok(Page.<Job>empty());
                 } else {
                     return Response.ok(new Page<>(1L, Lists.newArrayList(job)));
@@ -275,7 +248,7 @@ public class JobServiceImpl implements JobService {
 
             // find paging
             Long totalCount = jobDao.countByAppId(appId);
-            if (totalCount <= 0L){
+            if (totalCount <= 0L) {
                 return Response.ok(Page.<Job>empty());
             }
 
@@ -283,7 +256,7 @@ public class JobServiceImpl implements JobService {
             List<Job> jobs = jobDao.listByAppId(appId, paging.getOffset(), paging.getLimit());
 
             return Response.ok(new Page<>(totalCount, jobs));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to paging job (appId={}, jobClass={}, pageNo={}, pageSize={}), cause: {}",
                     appId, jobClass, pageNo, pageSize, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.find.failed");
@@ -295,12 +268,12 @@ public class JobServiceImpl implements JobService {
         try {
 
             Response<Page<Job>> pagingJobResp = pagingJob(appId, jobClass, pageNo, pageSize);
-            if(!pagingJobResp.isSuccess()){
+            if (!pagingJobResp.isOk()) {
                 return Response.notOk(pagingJobResp.getErr());
             }
 
             Page<Job> pagingJob = pagingJobResp.getData();
-            if (pagingJob.getTotal() <= 0){
+            if (pagingJob.getTotal() <= 0) {
                 return Response.ok(Page.<JobControl>empty());
             }
 
@@ -310,7 +283,7 @@ public class JobServiceImpl implements JobService {
 
             return Response.ok(pagingJobControl);
 
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to paging job control(appId={}, jobClass={}, pageNo={}, pageSize={}), cause: {}",
                     appId, jobClass, pageNo, pageSize, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.find.failed");
@@ -322,7 +295,7 @@ public class JobServiceImpl implements JobService {
         List<Job> jobs = pagingJob.getData();
 
         List<JobControl> jobControls = Lists.newCopyOnWriteArrayList();
-        for (Job job : jobs){
+        for (Job job : jobs) {
             jobControls.add(renderJobControl(appName, job));
         }
 
@@ -340,13 +313,13 @@ public class JobServiceImpl implements JobService {
         jobControl.setCron(job.getCron());
         jobControl.setDesc(job.getDesc());
 
-        if (Objects.equal(JobStatus.DISABLE.value(), job.getStatus())){
+        if (Objects.equal(JobStatus.DISABLE.value(), job.getStatus())) {
             // the job is disable
             jobControl.setStateAndDesc(JobState.DISABLE);
             return jobControl;
         }
 
-        if(!jobSupport.checkJobScheduling(appName, jobClass)){
+        if (!jobSupport.checkJobScheduling(appName, jobClass)) {
             // the job is enable, but don't be scheduled
             jobControl.setStateAndDesc(JobState.STOPPED);
             return jobControl;
@@ -356,19 +329,19 @@ public class JobServiceImpl implements JobService {
         JobState jobState = jobSupport.getJobState(appName, jobClass);
         jobControl.setStateAndDesc(jobState);
 
-        if (!JobState.isScheduling(jobState)){
+        if (!JobState.isScheduling(jobState)) {
             return jobControl;
         }
 
         // scheduler
         String scheduler = jobSupport.getJobScheduler(appName, jobClass);
-        if (!Strings.isNullOrEmpty(scheduler)){
+        if (!Strings.isNullOrEmpty(scheduler)) {
             jobControl.setScheduler(scheduler);
         }
 
         // fire time
         JobFireTime jobFireTime = jobSupport.getJobFireTime(appName, jobClass);
-        if (jobFireTime != null){
+        if (jobFireTime != null) {
             jobControl.setFireTime(jobFireTime.getCurrent());
             jobControl.setPrevFireTime(jobFireTime.getPrev());
             jobControl.setNextFireTime(jobFireTime.getNext());
@@ -381,7 +354,7 @@ public class JobServiceImpl implements JobService {
     public Response<Boolean> createJobInstance(JobInstance instance) {
         try {
             return Response.ok(jobInstanceManager.create(instance));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to save job instance({}), cause: {}",
                     instance, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.instance.save.failed");
@@ -394,7 +367,7 @@ public class JobServiceImpl implements JobService {
         try {
 
             JobInstance instance = jobInstanceDao.findById(jobInstanceId);
-            if (instance == null){
+            if (instance == null) {
                 return Response.notOk("job.instance.not.exist");
             }
 
@@ -404,7 +377,7 @@ public class JobServiceImpl implements JobService {
 
             return Response.ok(jobInstanceDao.save(instance));
 
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to failed job instance(id={}, cause={}), cause: {}",
                     jobInstanceId, cause, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.instance.save.failed");
@@ -415,7 +388,7 @@ public class JobServiceImpl implements JobService {
     public Response<JobInstance> findJobInstanceById(Long instanceId) {
         try {
             return Response.ok(jobInstanceDao.findById(instanceId));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to find job instance(jobInstanceId={}), cause: {}",
                     instanceId, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.instance.find.failed");
@@ -427,13 +400,13 @@ public class JobServiceImpl implements JobService {
         try {
 
             Long jobId = jobDao.findIdByJobClass(appId, jobClass);
-            if (jobId == null){
+            if (jobId == null) {
                 return Response.notOk("job.not.exist");
             }
 
             // find paging
             Long totalCount = jobInstanceDao.countByJobId(jobId);
-            if (totalCount <= 0L){
+            if (totalCount <= 0L) {
                 return Response.ok(Page.<JobInstanceDto>empty());
             }
 
@@ -442,22 +415,44 @@ public class JobServiceImpl implements JobService {
             List<JobInstanceDto> instanceDtos = renderJobInstanceDtos(instances);
 
             return Response.ok(new Page<>(totalCount, instanceDtos));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to paging job instance(appId={}, jobClass={}, pageNo={}, pageSize={}), cause: {}",
                     appId, jobClass, pageNo, pageSize, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.instance.find.failed");
         }
     }
 
+    @Override
+    public Response<Page<JobInstanceDto>> pagingJobInstance(Long jobId, Integer pageNo, Integer pageSize) {
+        try {
+
+            // find paging
+            Long totalCount = jobInstanceDao.countByJobId(jobId);
+            if (totalCount <= 0L) {
+                return Response.ok(Page.<JobInstanceDto>empty());
+            }
+
+            Paging paging = new Paging(pageNo, pageSize);
+            List<JobInstance> instances = jobInstanceDao.listByJobId(jobId, paging.getOffset(), paging.getLimit());
+            List<JobInstanceDto> instanceDtos = renderJobInstanceDtos(instances);
+
+            return Response.ok(new Page<>(totalCount, instanceDtos));
+        } catch (Exception e) {
+            Logs.error("failed to paging job instance(jobId={}, pageNo={}, pageSize={}), cause: {}",
+                    jobId, pageNo, pageSize, Throwables.getStackTraceAsString(e));
+            return Response.notOk("job.instance.find.failed");
+        }
+    }
+
     private List<JobInstanceDto> renderJobInstanceDtos(List<JobInstance> instances) {
 
-        if (CollectionUtil.isNullOrEmpty(instances)){
+        if (CollectionUtil.isNullOrEmpty(instances)) {
             return Collections.emptyList();
         }
 
         List<JobInstanceDto> instanceDtos = Lists.newArrayListWithExpectedSize(instances.size());
 
-        for (JobInstance instance : instances){
+        for (JobInstance instance : instances) {
             instanceDtos.add(renderJobInstanceDto(instance));
         }
 
@@ -473,7 +468,7 @@ public class JobServiceImpl implements JobService {
         instanceDto.setStatus(instance.getStatus());
         instanceDto.setTriggerType(instance.getTriggerType());
         instanceDto.setStartTime(Dates.format(instance.getStartTime()));
-        if(instance.getEndTime() != null){
+        if (instance.getEndTime() != null) {
             instanceDto.setEndTime(Dates.format(instance.getEndTime()));
             instanceDto.setCostTime(Dates.timeIntervalStr(instance.getStartTime(), instance.getEndTime()));
         }
@@ -489,7 +484,7 @@ public class JobServiceImpl implements JobService {
 
             // find paging
             Long totalCount = jobInstanceShardDao.countByInstanceId(jobInstanceId);
-            if (totalCount <= 0L){
+            if (totalCount <= 0L) {
                 return Response.ok(Page.<JobInstanceShardDto>empty());
             }
 
@@ -501,7 +496,7 @@ public class JobServiceImpl implements JobService {
 
             return Response.ok(new Page<>(totalCount, shardDtos));
 
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to paging job instance progress(jobInstanceId={}, pageNo={}, pageSize={}), cause: {}",
                     jobInstanceId, pageNo, pageSize, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.instance.shard.find.failed");
@@ -510,13 +505,13 @@ public class JobServiceImpl implements JobService {
 
     private List<JobInstanceShardDto> renderJobInstanceShardDtos(List<JobInstanceShard> shards) {
 
-        if (CollectionUtil.isNullOrEmpty(shards)){
+        if (CollectionUtil.isNullOrEmpty(shards)) {
             return Collections.emptyList();
         }
 
         List<JobInstanceShardDto> shardDtos = Lists.newArrayListWithExpectedSize(shards.size());
 
-        for (JobInstanceShard shard : shards){
+        for (JobInstanceShard shard : shards) {
             shardDtos.add(renderJobInstanceShardDto(shard));
         }
 
@@ -546,7 +541,7 @@ public class JobServiceImpl implements JobService {
     public Response<List<Long>> findJobIdsByServer(String server) {
         try {
             return Response.ok(jobServerDao.findJobsByServer(server));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to find jobs by server(server={}), cause: {}",
                     server, Throwables.getStackTraceAsString(e));
             return Response.notOk("server.find.job.failed");
@@ -557,11 +552,11 @@ public class JobServiceImpl implements JobService {
     public Response<List<Job>> findJobsByServer(String server) {
         try {
             List<Long> jobIds = jobServerDao.findJobsByServer(server);
-            if (jobIds == null || jobIds.isEmpty()){
+            if (jobIds == null || jobIds.isEmpty()) {
                 return Response.ok(Collections.<Job>emptyList());
             }
             return Response.ok(jobDao.findByIds(jobIds));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to find jobs by server(server={}), cause: {}",
                     server, Throwables.getStackTraceAsString(e));
             return Response.notOk("server.find.job.failed");
@@ -572,19 +567,19 @@ public class JobServiceImpl implements JobService {
     public Response<List<JobDetail>> findValidJobsByServer(String server) {
         try {
             List<Long> jobIds = jobServerDao.findJobsByServer(server);
-            if (jobIds == null || jobIds.isEmpty()){
+            if (jobIds == null || jobIds.isEmpty()) {
                 return Response.ok(Collections.<JobDetail>emptyList());
             }
             List<JobDetail> details = Lists.newArrayListWithExpectedSize(jobIds.size());
             JobDetail jobDetail;
-            for (Long jobId : jobIds){
+            for (Long jobId : jobIds) {
                 jobDetail = findJobDetail(jobId, JobStatus.ENABLE);
-                if (jobDetail != null){
+                if (jobDetail != null) {
                     details.add(jobDetail);
                 }
             }
             return Response.ok(details);
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to find jobs by server(server={}), cause: {}",
                     server, Throwables.getStackTraceAsString(e));
             return Response.notOk("server.find.job.failed");
@@ -595,7 +590,7 @@ public class JobServiceImpl implements JobService {
     public Response<Boolean> removeAllJobsByServer(String server) {
         try {
             return Response.ok(jobServerDao.unbindJobsOfServer(server));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to find jobs by server(server={}), cause: {}",
                     server, Throwables.getStackTraceAsString(e));
             return Response.notOk("server.remove.job.failed");
@@ -616,7 +611,7 @@ public class JobServiceImpl implements JobService {
 
             return Response.ok(jobServerDao.bind(jobServer));
 
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to find jobs by server(server={}), cause: {}",
                     server, Throwables.getStackTraceAsString(e));
             return Response.notOk("server.bind.job.failed");
@@ -627,7 +622,7 @@ public class JobServiceImpl implements JobService {
     public Response<String> findServerOfJob(Long jobId) {
         try {
             return Response.ok(jobServerDao.findServerByJobId(jobId));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to find server of the job(id={}), cause: {}",
                     jobId, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.find.server.failed");
@@ -638,7 +633,7 @@ public class JobServiceImpl implements JobService {
     public Response<JobConfig> findJobConfigByJobId(Long jobId) {
         try {
             return Response.ok(jobConfigDao.findByJobId(jobId));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to find config of the job(jobId={}), cause: {}",
                     jobId, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.config.find.failed");
@@ -659,16 +654,16 @@ public class JobServiceImpl implements JobService {
     public Response<JobInstanceDetail> monitorJobInstanceDetail(Long jobId) {
         try {
 
-            Long instanceId =jobInstanceDao.findMaxId(jobId);
-            if (instanceId == null){
+            Long instanceId = jobInstanceDao.findMaxId(jobId);
+            if (instanceId == null) {
                 return Response.notOk("job.not.running");
             }
 
             return Response.ok(renderJobRunningInstance(instanceId));
 
-        } catch (JobInstanceNotExistException e){
+        } catch (JobInstanceNotExistException e) {
             return Response.notOk("job.instance.not.exist");
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to monitor the job instance detail(jobId={}), cause: {}",
                     jobId, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.instance.detail.monitor.failed");
@@ -679,9 +674,9 @@ public class JobServiceImpl implements JobService {
     public Response<JobInstanceDetail> findJobInstanceDetail(Long jobInstanceId) {
         try {
             return Response.ok(renderJobRunningInstance(jobInstanceId));
-        } catch (JobInstanceNotExistException e){
+        } catch (JobInstanceNotExistException e) {
             return Response.notOk("job.instance.not.exist");
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to find the job instance detail(jobInstanceId={}), cause: {}",
                     jobInstanceId, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.instance.detail.find.failed");
@@ -691,7 +686,7 @@ public class JobServiceImpl implements JobService {
     private JobInstanceDetail renderJobRunningInstance(Long instanceId) {
 
         JobInstance instance = jobInstanceDao.findById(instanceId);
-        if (instance == null){
+        if (instance == null) {
             throw new JobInstanceNotExistException();
         }
 
@@ -702,7 +697,7 @@ public class JobServiceImpl implements JobService {
         runningInstance.setInstanceId(instanceId);
         runningInstance.setStatus(instance.getStatus());
         runningInstance.setStartTime(Dates.format(instance.getStartTime()));
-        if (instance.getEndTime() != null){
+        if (instance.getEndTime() != null) {
             runningInstance.setEndTime(Dates.format(instance.getEndTime()));
         }
 
@@ -732,14 +727,14 @@ public class JobServiceImpl implements JobService {
         try {
 
             JobDetail jobDetail = findJobDetail(jobId, null);
-            if (jobDetail == null){
+            if (jobDetail == null) {
                 return Response.notOk("job.not.exist");
             }
 
             jobSupport.forceStopJobInstance(jobDetail, JobInstanceStatus.TERMINATED);
 
             return Response.ok(true);
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to force finish the job(id={}), cause: {}",
                     jobId, Throwables.getStackTraceAsString(e));
             return Response.notOk("operate.failed");
@@ -750,7 +745,7 @@ public class JobServiceImpl implements JobService {
     public Response<Boolean> unbindJobServer(String server, Long jobId) {
         try {
             return Response.ok(jobServerDao.unbindJob(jobId));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to unbind the job server(server={}, jobId={}), cause: {}",
                     jobId, Throwables.getStackTraceAsString(e));
             return Response.notOk("operate.failed");
@@ -762,12 +757,12 @@ public class JobServiceImpl implements JobService {
         try {
 
             Job nextJob = jobDao.findById(dependence.getNextJobId());
-            if (nextJob == null){
+            if (nextJob == null) {
                 return Response.notOk("job.not.exist");
             }
 
             return Response.ok(jobDependenceDao.addDependence(dependence));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to add the job dependence({}), cause: {}",
                     dependence, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.dependence.add.failed");
@@ -778,7 +773,7 @@ public class JobServiceImpl implements JobService {
     public Response<Boolean> deleteNextJob(Long jobId, Long nextJobId) {
         try {
             return Response.ok(jobDependenceDao.deleteNextJobId(jobId, nextJobId));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to delete the job dependence(jobId={}, nextJobId={}), cause: {}",
                     jobId, nextJobId, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.dependence.delete.failed");
@@ -789,7 +784,7 @@ public class JobServiceImpl implements JobService {
     public Response<Boolean> deleteNextJobs(Long jobId) {
         try {
             return Response.ok(jobDependenceDao.deleteNextJobIds(jobId));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to delete the job dependences(jobId={}), cause: {}",
                     jobId, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.dependence.delete.failed");
@@ -803,13 +798,13 @@ public class JobServiceImpl implements JobService {
             Paging paging = new Paging(pageNo, pageSize);
 
             Page<Long> pagingJobIds = jobDependenceDao.pagingNextJobIds(jobId, paging.getOffset(), paging.getLimit());
-            if (pagingJobIds.getTotal() <= 0L){
+            if (pagingJobIds.getTotal() <= 0L) {
                 return Response.ok(Page.<DependenceJob>empty());
             }
 
             return Response.ok(renderDependenceJobs(pagingJobIds));
 
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to paging the next jobs(jobId={}, pageNo={}, pageSize={}), cause: {}",
                     jobId, pageNo, pageSize, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.dependence.find.failed");
@@ -826,7 +821,7 @@ public class JobServiceImpl implements JobService {
 
             return Response.ok(pagingJobIds);
 
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to paging the next job ids(jobId={}, pageNo={}, pageSize={}), cause: {}",
                     jobId, pageNo, pageSize, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.dependence.find.failed");
@@ -838,7 +833,7 @@ public class JobServiceImpl implements JobService {
         List<DependenceJob> dependenceJobs = Lists.newArrayListWithCapacity(pagingJobIds.getData().size());
 
         DependenceJob dependenceJob;
-        for (Long jobId : pagingJobIds.getData()){
+        for (Long jobId : pagingJobIds.getData()) {
             dependenceJob = renderDependenceJob(jobId);
             if (dependenceJob != null) {
                 dependenceJobs.add(dependenceJob);
@@ -851,7 +846,7 @@ public class JobServiceImpl implements JobService {
     private DependenceJob renderDependenceJob(Long jobId) {
 
         Job job = jobDao.findById(jobId);
-        if (job == null){
+        if (job == null) {
             Logs.warn("The job(id={}) doesn't exist when render dependence job.", jobId);
             return null;
         }
@@ -871,18 +866,18 @@ public class JobServiceImpl implements JobService {
         try {
 
             Response<JobDetail> jobDetailResp = findJobDetailById(jobId);
-            if (!jobDetailResp.isSuccess()){
+            if (!jobDetailResp.isOk()) {
                 return Response.notOk(jobDetailResp.getErr());
             }
             JobDetail jobDetail = jobDetailResp.getData();
 
             // get all alive clients
             Response<List<ClientInfo>> clientInfosResp = clusterService.listClients(jobDetail.getApp().getId());
-            if (!clientInfosResp.isSuccess()){
+            if (!clientInfosResp.isOk()) {
                 return Response.notOk(clientInfosResp.getErr());
             }
             List<ClientInfo> clientInfos = clientInfosResp.getData();
-            if (CollectionUtil.isNullOrEmpty(clientInfos)){
+            if (CollectionUtil.isNullOrEmpty(clientInfos)) {
                 return Response.ok(Collections.<JobAssignDto>emptyList());
             }
 
@@ -892,7 +887,7 @@ public class JobServiceImpl implements JobService {
 
             return Response.ok(jobAssignDtos);
 
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to paging the job assigns(jobId={}), cause: {}", jobId, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.assign.find.failed");
         }
@@ -906,13 +901,13 @@ public class JobServiceImpl implements JobService {
         JobAssignDto assignDto;
         String clientIp;
         boolean assign;
-        for (ClientInfo clientInfo : clientInfos){
+        for (ClientInfo clientInfo : clientInfos) {
 
             clientIp = clientInfo.getAddr().split(":")[0];
             assign = CollectionUtil.isNullOrEmpty(assigns) || assigns.contains(clientIp);
 
             assignDto = assignDtos.get(clientIp);
-            if (assignDto == null){
+            if (assignDto == null) {
                 assignDto = renderAssignDto(clientIp, assign, clientInfo.getAddr());
                 assignDtos.put(clientIp, assignDto);
             } else {
@@ -941,8 +936,8 @@ public class JobServiceImpl implements JobService {
 
             jobAssignDao.cleanAssign(jobId);
 
-            if (!Strings.isNullOrEmpty(clientIps)){
-                if (JOB_ASSIGN_EMPTY_PLACE_HOLDER.equals(clientIps)){
+            if (!Strings.isNullOrEmpty(clientIps)) {
+                if (JOB_ASSIGN_EMPTY_PLACE_HOLDER.equals(clientIps)) {
                     // -1: empty assigned clients
                     jobAssignDao.addAssign(jobId, JOB_ASSIGN_EMPTY_PLACE_HOLDER);
                 } else {
@@ -951,7 +946,7 @@ public class JobServiceImpl implements JobService {
             }
 
             return Response.ok(true);
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to save the job assigns(jobId={}, clientIps={}), cause: {}",
                     jobId, clientIps, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.assign.save.failed");
@@ -962,28 +957,38 @@ public class JobServiceImpl implements JobService {
     public Response<Set<String>> listSimpleJobAssigns(Long jobId) {
         try {
             return Response.ok(jobAssignDao.listAssigns(jobId));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to list the job simple assigns(jobId={}), cause: {}", jobId, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.assign.find.failed");
         }
     }
 
+    @Override
+    public Response<Boolean> deleteInstance(Long insId) {
+        return Response.ok(jobInstanceManager.deleteById(insId));
+    }
+
+    @Override
+    public Response<Boolean> deleteJobInstances(Long jobId) {
+        return Response.ok(jobInstanceManager.deleteByJobId(jobId));
+    }
+
     private Response<Boolean> updateJobStatus(Long jobId, JobStatus status) {
         try {
             Job job = jobDao.findById(jobId);
-            if (job == null){
+            if (job == null) {
                 Logs.warn("The job(id={}) doesn't exist when disable.", jobId);
                 return Response.ok(true);
             }
 
-            if (Objects.equal(status.value(), job.getStatus())){
+            if (Objects.equal(status.value(), job.getStatus())) {
                 return Response.ok(true);
             }
 
             job.setStatus(status.value());
 
             return Response.ok(jobDao.save(job));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to update the job(jobId={}) to status({}), cause: {}",
                     jobId, status, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.update.status.failed");
@@ -998,7 +1003,7 @@ public class JobServiceImpl implements JobService {
             instance.setMaxShardPullCount(config.getMaxShardPullCount());
             instance.setJobParam(config.getParam());
             instance.setTotalShardCount(config.getShardCount());
-            if(!jobInstanceManager.create(instance)){
+            if (!jobInstanceManager.create(instance)) {
                 Logs.error("failed to create job instance({}).", instance);
                 return Response.ok(false);
             }
@@ -1007,17 +1012,17 @@ public class JobServiceImpl implements JobService {
             List<Long> shardIds = createJobInstanceShards(instance, config);
 
             // create the shards counter
-            if(!jobInstanceShardDao.createNewShardsSet(instance.getId(), shardIds)){
+            if (!jobInstanceShardDao.createNewShardsSet(instance.getId(), shardIds)) {
                 Logs.error("failed to create shards counter(jobInstanceId={}).", instance.getId());
                 return Response.ok(false);
             }
 
             return Response.ok(true);
 
-        } catch (ShardOperateException e){
+        } catch (ShardOperateException e) {
             Logs.error("failed to create job instance shard, cause: {}", Throwables.getStackTraceAsString(e));
             return Response.ok(false);
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to create job instance and shards(instance={}, config={}), cause: {}",
                     instance, config, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.instance.shard.create.failed");
@@ -1030,22 +1035,22 @@ public class JobServiceImpl implements JobService {
         List<Long> shardIds = Lists.newArrayListWithExpectedSize(config.getShardCount());
 
         String[] shardParams = null;
-        if (!Strings.isNullOrEmpty(config.getShardParams())){
+        if (!Strings.isNullOrEmpty(config.getShardParams())) {
             shardParams = config.getShardParams().split(Constants.JOB_SHARD_PARAMS_DELIMITER);
         }
 
-        for (int i=0; i<config.getShardCount(); i++){
+        for (int i = 0; i < config.getShardCount(); i++) {
             shard = new JobInstanceShard();
             shard.setInstanceId(instance.getId());
 
             shard.setStatus(JobInstanceShardStatus.NEW.value());
             shard.setPullCount(0);
             shard.setItem(i);
-            if (shardParams != null && shardParams.length > i){
+            if (shardParams != null && shardParams.length > i) {
                 shard.setParam(shardParams[shard.getItem()].split(Constants.JOB_SHARD_PARAMS_KV_DELIMITER)[1]);
             }
 
-            if (!jobInstanceShardManager.save(shard)){
+            if (!jobInstanceShardManager.save(shard)) {
                 Logs.error("failed to create job instance shard(instance={}, config={}).", instance, config);
                 throw new ShardOperateException(ShardOperateRespCode.SHARD_CREATE_FAILED);
             }
@@ -1073,9 +1078,9 @@ public class JobServiceImpl implements JobService {
 
             return Response.ok(pullShard);
 
-        } catch (ShardOperateException e){
+        } catch (ShardOperateException e) {
             return Response.notOk(Response.BUSINESS_ERR, e.getCode().value());
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to pull job instance shard(instanceId={}), cause: {}",
                     jobInstanceId, Throwables.getStackTraceAsString(e));
             return Response.notOk(Response.BUSINESS_ERR, ShardOperateRespCode.SHARD_PULL_FAILED.value());
@@ -1083,7 +1088,7 @@ public class JobServiceImpl implements JobService {
     }
 
     private void checkJobAssign(Long jobId, String client) {
-        if (!jobAssignDao.isAssigned(jobId, client.split(":")[0])){
+        if (!jobAssignDao.isAssigned(jobId, client.split(":")[0])) {
             throw new ShardOperateException(ShardOperateRespCode.IP_NOT_ASSIGNED);
         }
     }
@@ -1111,9 +1116,9 @@ public class JobServiceImpl implements JobService {
             Boolean success = jobInstanceShardManager.returnShard(jobInstanceId, shardId, client);
 
             return Response.ok(success);
-        } catch (ShardOperateException e){
+        } catch (ShardOperateException e) {
             return Response.notOk(Response.BUSINESS_ERR, e.getCode().value());
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to push job instance shard(instanceId={}, shardId={}, client={}), cause: {}",
                     jobInstanceId, shardId, client, Throwables.getStackTraceAsString(e));
             return Response.notOk(Response.BUSINESS_ERR, ShardOperateRespCode.SHARD_RETURN_FAILED.value());
@@ -1122,12 +1127,12 @@ public class JobServiceImpl implements JobService {
 
     private JobInstance checkJobInstanceStatus(Long jobInstanceId) {
         JobInstance instance = jobInstanceDao.findById(jobInstanceId);
-        if (instance == null){
+        if (instance == null) {
             Logs.warn("The job instance(id={}) isn't exist when pull shard.", jobInstanceId);
             throw new ShardOperateException(ShardOperateRespCode.INSTANCE_NOT_EXIST);
         }
 
-        if (JobInstanceStatus.isFinal(instance.getStatus())){
+        if (JobInstanceStatus.isFinal(instance.getStatus())) {
             throw new ShardOperateException(ShardOperateRespCode.INSTANCE_IS_FINAL);
         }
 
@@ -1144,20 +1149,20 @@ public class JobServiceImpl implements JobService {
 
             // finish the job shard
             finished = jobInstanceShardManager.finishShard(shardFinishDto);
-            if (!finished){
+            if (!finished) {
                 return Response.notOk(Response.BUSINESS_ERR, ShardOperateRespCode.SHARD_FINISH_FAILED);
             }
 
             return Response.ok(Boolean.TRUE);
-        } catch (ShardOperateException e){
+        } catch (ShardOperateException e) {
             return Response.notOk(Response.BUSINESS_ERR, e.getCode().value());
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to finish job instance shard(shardFinishDto={}), cause: {}",
                     shardFinishDto, Throwables.getStackTraceAsString(e));
             return Response.notOk(Response.BUSINESS_ERR, ShardOperateRespCode.SHARD_FINISH_FAILED.value());
         } finally {
             // check whether the job instance has finished or not
-            if (instance != null && finished){
+            if (instance != null && finished) {
                 jobSupport.checkJobInstanceFinish(shardFinishDto);
             }
         }
@@ -1169,14 +1174,14 @@ public class JobServiceImpl implements JobService {
 
             List<Long> shardIds = jobInstanceShardDao.getClientRunningShards(client);
 
-            if (!CollectionUtil.isNullOrEmpty(shardIds)){
+            if (!CollectionUtil.isNullOrEmpty(shardIds)) {
                 JobInstanceShard shard;
-                for (Long shardId : shardIds){
+                for (Long shardId : shardIds) {
                     shard = jobInstanceShardDao.findById(shardId);
                     if (shard != null &&
-                            Objects.equal(JobInstanceShardStatus.RUNNING.value(), shard.getStatus())){
+                            Objects.equal(JobInstanceShardStatus.RUNNING.value(), shard.getStatus())) {
                         // push the shard back to shards set
-                        if(!jobInstanceShardManager.returnShard(shard.getInstanceId(), shardId, client)){
+                        if (!jobInstanceShardManager.returnShard(shard.getInstanceId(), shardId, client)) {
                             Logs.warn("failed to push the shard({}) back by client({}).", shard, client);
                         }
                     }
@@ -1185,9 +1190,9 @@ public class JobServiceImpl implements JobService {
 
             return Response.ok(true);
 
-        } catch (ShardOperateException e){
+        } catch (ShardOperateException e) {
             return Response.notOk(Response.BUSINESS_ERR, e.getCode().value());
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to return job instance shards by client(client={}), cause: {}",
                     client, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.instance.shard.return.failed");
@@ -1198,7 +1203,7 @@ public class JobServiceImpl implements JobService {
     public Response<JobInstanceShard> findJobInstanceShardById(Long shardId) {
         try {
             return Response.ok(jobInstanceShardDao.findById(shardId));
-        } catch (Exception e){
+        } catch (Exception e) {
             Logs.error("failed to find job instance shard(id={}), cause: {}",
                     shardId, Throwables.getStackTraceAsString(e));
             return Response.notOk("job.instance.shard.find.failed");
@@ -1207,15 +1212,85 @@ public class JobServiceImpl implements JobService {
 
     private App findAppById(Long appId) {
         Response<App> findResp = appService.findById(appId);
-        if (!findResp.isSuccess()){
+        if (!findResp.isOk()) {
             throw new RuntimeException("Failed to find app, id = " + appId);
         }
 
         App app = findResp.getData();
-        if (app == null){
+        if (app == null) {
             throw new RuntimeException("The app isn't exist, id = " + appId);
         }
 
         return app;
+    }
+
+    @Autowired
+    public void setJobDao(JobDao jobDao) {
+        this.jobDao = jobDao;
+    }
+
+    @Autowired
+    public void setJobInstanceDao(JobInstanceDao jobInstanceDao) {
+        this.jobInstanceDao = jobInstanceDao;
+    }
+
+    @Autowired
+    public void setJobConfigDao(JobConfigDao jobConfigDao) {
+        this.jobConfigDao = jobConfigDao;
+    }
+
+    @Autowired
+    public void setJobServerDao(JobServerDao jobServerDao) {
+        this.jobServerDao = jobServerDao;
+    }
+
+    @Autowired
+    public void setJobInstanceShardDao(JobInstanceShardDao jobInstanceShardDao) {
+        this.jobInstanceShardDao = jobInstanceShardDao;
+    }
+
+    @Autowired
+    public void setJobDependenceDao(JobDependenceDao jobDependenceDao) {
+        this.jobDependenceDao = jobDependenceDao;
+    }
+
+    @Autowired
+    public void setJobAssignDao(JobAssignDao jobAssignDao) {
+        this.jobAssignDao = jobAssignDao;
+    }
+
+    @Autowired
+    public void setJobManager(JobManager jobManager) {
+        this.jobManager = jobManager;
+    }
+
+    @Autowired
+    public void setJobConfigManager(JobConfigManager jobConfigManager) {
+        this.jobConfigManager = jobConfigManager;
+    }
+
+    @Autowired
+    public void setJobInstanceManager(JobInstanceManager jobInstanceManager) {
+        this.jobInstanceManager = jobInstanceManager;
+    }
+
+    @Autowired
+    public void setJobInstanceShardManager(JobInstanceShardManager jobInstanceShardManager) {
+        this.jobInstanceShardManager = jobInstanceShardManager;
+    }
+
+    @Autowired
+    public void setAppService(AppService appService) {
+        this.appService = appService;
+    }
+
+    @Autowired
+    public void setClusterService(ClusterService clusterService) {
+        this.clusterService = clusterService;
+    }
+
+    @Autowired
+    public void setJobSupport(JobSupport jobSupport) {
+        this.jobSupport = jobSupport;
     }
 }

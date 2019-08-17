@@ -1,13 +1,10 @@
 package me.hao0.antares.store.service;
 
 import me.hao0.antares.common.dto.*;
-import me.hao0.antares.common.model.Job;
-import me.hao0.antares.common.model.JobConfig;
-import me.hao0.antares.common.model.JobDependence;
-import me.hao0.antares.common.model.JobInstance;
-import me.hao0.antares.common.model.JobInstanceShard;
-import me.hao0.antares.store.util.Page;
+import me.hao0.antares.common.model.*;
 import me.hao0.antares.common.util.Response;
+import me.hao0.antares.store.util.Page;
+
 import java.util.List;
 import java.util.Set;
 
@@ -20,6 +17,7 @@ public interface JobService {
 
     /**
      * Save the job dto
+     *
      * @param editing the job edit dto
      * @return return the job id
      */
@@ -27,6 +25,7 @@ public interface JobService {
 
     /**
      * Save the job detail
+     *
      * @param jobDetail the job detail
      * @return return the job id
      */
@@ -34,6 +33,7 @@ public interface JobService {
 
     /**
      * Delete the job physically
+     *
      * @param jobId the job id
      * @return return true if delete successfully, or false
      */
@@ -41,6 +41,7 @@ public interface JobService {
 
     /**
      * Find the job
+     *
      * @param jobId the job id
      * @return the job
      */
@@ -48,6 +49,7 @@ public interface JobService {
 
     /**
      * Find the job detail
+     *
      * @param jobId the job id
      * @return the job detail
      */
@@ -55,9 +57,10 @@ public interface JobService {
 
     /**
      * Paging the job
-     * @param appId the app id
+     *
+     * @param appId    the app id
      * @param jobClass the job class full name
-     * @param pageNo the page number
+     * @param pageNo   the page number
      * @param pageSize the page size
      * @return the job page data
      */
@@ -65,9 +68,10 @@ public interface JobService {
 
     /**
      * Paging the job control
-     * @param appId the app id
+     *
+     * @param appId    the app id
      * @param jobClass the job class
-     * @param pageNo the page number
+     * @param pageNo   the page number
      * @param pageSize the page size
      * @return the job control page data
      */
@@ -75,6 +79,7 @@ public interface JobService {
 
     /**
      * Save the job instance
+     *
      * @param instance the job instance
      * @return return true if save successfully, or false
      */
@@ -82,14 +87,16 @@ public interface JobService {
 
     /**
      * The job instance is failed
+     *
      * @param jobInstanceId the job instance id
-     * @param cause the failed cause
+     * @param cause         the failed cause
      * @return return true if operate successfully, or false
      */
     Response<Boolean> failedJobInstance(Long jobInstanceId, String cause);
 
     /**
      * Find the job instance
+     *
      * @param instanceId the job instance id
      * @return the job instance
      */
@@ -97,25 +104,39 @@ public interface JobService {
 
     /**
      * Paging the job instance
-     * @param appId the app id
+     *
+     * @param appId    the app id
      * @param jobClass the job class
-     * @param pageNo the page no
+     * @param pageNo   the page no
      * @param pageSize the page size
      * @return job instance page data
      */
     Response<Page<JobInstanceDto>> pagingJobInstance(Long appId, String jobClass, Integer pageNo, Integer pageSize);
 
+
+    /**
+     * Paging the job instance
+     *
+     * @param jobId    the job id
+     * @param pageNo   the page no
+     * @param pageSize the page size
+     * @return job instance page data
+     */
+    Response<Page<JobInstanceDto>> pagingJobInstance(Long jobId, Integer pageNo, Integer pageSize);
+
     /**
      * Paging the job instance progress
+     *
      * @param jobinstanceId the job instance id
-     * @param pageNo the page no
-     * @param pageSize the page size
+     * @param pageNo        the page no
+     * @param pageSize      the page size
      * @return the job instance progress page data
      */
     Response<Page<JobInstanceShardDto>> pagingJobInstanceShards(Long jobinstanceId, Integer pageNo, Integer pageSize);
 
     /**
      * Find all jobs of the server
+     *
      * @param server the server
      * @return all jobs of the server
      */
@@ -123,31 +144,35 @@ public interface JobService {
 
     /**
      * Create the job instance and shards
+     *
      * @param instance the job instance
-     * @param config the job config
+     * @param config   the job config
      * @return return true if create successfully, or false
      */
     Response<Boolean> createJobInstanceAndShards(JobInstance instance, JobConfig config);
 
     /**
      * Pull the job instance's shard
+     *
      * @param jobInstanceId the job instance
-     * @param client the client host
+     * @param client        the client host
      * @return the pull shard
      */
     Response<PullShard> pullJobInstanceShard(Long jobInstanceId, String client);
 
     /**
      * Return back the job instance's shard back
+     *
      * @param jobInstanceId the job instance
-     * @param shardId the shard id
-     * @param client the client host
+     * @param shardId       the shard id
+     * @param client        the client host
      * @return return true if return successfully, or false
      */
     Response<Boolean> returnJobInstanceShard(Long jobInstanceId, Long shardId, String client);
 
     /**
      * Finish the job instance' shard
+     *
      * @param shardFinishDto the shard finish dto
      * @return return true if finish successfully, or false
      */
@@ -155,6 +180,7 @@ public interface JobService {
 
     /**
      * Return back the client's all running shards
+     *
      * @param client the client host:pid
      * @return return true if return successfully, or false
      */
@@ -162,6 +188,7 @@ public interface JobService {
 
     /**
      * Find the job instance shard
+     *
      * @param shardId the shard id
      * @return the job instance shard
      */
@@ -169,6 +196,7 @@ public interface JobService {
 
     /**
      * Find all job ids of the server
+     *
      * @param server the server
      * @return all job ids of the server
      */
@@ -176,6 +204,7 @@ public interface JobService {
 
     /**
      * Find all jobs of the server
+     *
      * @param server the server
      * @return all jobs of the server
      */
@@ -183,6 +212,7 @@ public interface JobService {
 
     /**
      * Remove all jobs of the server
+     *
      * @param server the server
      * @return return successfully if remove successfully, or false
      */
@@ -190,7 +220,8 @@ public interface JobService {
 
     /**
      * Bind the job to server for scheduling
-     * @param jobId the job id
+     *
+     * @param jobId  the job id
      * @param server the server host
      * @return return true if bind success, or false
      */
@@ -198,6 +229,7 @@ public interface JobService {
 
     /**
      * Find the job's current schedule server
+     *
      * @param jobId the job id
      * @return the schedule server
      */
@@ -205,6 +237,7 @@ public interface JobService {
 
     /**
      * Find the job's config
+     *
      * @param jobId the job id
      * @return the job config
      */
@@ -212,6 +245,7 @@ public interface JobService {
 
     /**
      * Disable the job
+     *
      * @param jobId the job id
      * @return return true if disable successfully, or false
      */
@@ -219,6 +253,7 @@ public interface JobService {
 
     /**
      * Enable the job
+     *
      * @param jobId the job id
      * @return return true if enable successfully, or false
      */
@@ -226,6 +261,7 @@ public interface JobService {
 
     /**
      * Monitor the job instance detail
+     *
      * @param jobId the job id
      * @return the job instance detail
      */
@@ -233,6 +269,7 @@ public interface JobService {
 
     /**
      * Find the job instance detail
+     *
      * @param jobInstanceId the job instance id
      * @return the job instance detail
      */
@@ -240,6 +277,7 @@ public interface JobService {
 
     /**
      * Terminate the current job instance
+     *
      * @param jobId the job id
      * @return return true if force to finish successfully
      */
@@ -247,14 +285,16 @@ public interface JobService {
 
     /**
      * Unbind the job from the server
+     *
      * @param server the server host
-     * @param jobId the job id
+     * @param jobId  the job id
      * @return return true if unbind successfully, or false
      */
     Response<Boolean> unbindJobServer(String server, Long jobId);
 
     /**
      * Add the job dependence
+     *
      * @param dependence the job dependence
      * @return return true if add successfully, or false
      */
@@ -262,7 +302,8 @@ public interface JobService {
 
     /**
      * Delete the job's next job
-     * @param jobId the job id
+     *
+     * @param jobId     the job id
      * @param nextJobId the next job id
      * @return return true if delete successfully, or false
      */
@@ -270,6 +311,7 @@ public interface JobService {
 
     /**
      * Delete the job's next jobs
+     *
      * @param jobId the job id
      * @return return true if delete successfully, or false
      */
@@ -277,8 +319,9 @@ public interface JobService {
 
     /**
      * Paging the job's next jobs
-     * @param jobId the job id
-     * @param pageNo the page number
+     *
+     * @param jobId    the job id
+     * @param pageNo   the page number
      * @param pageSize the page size
      * @return the job's next page jobs
      */
@@ -286,8 +329,9 @@ public interface JobService {
 
     /**
      * Paging the job's next job ids
-     * @param jobId the job id
-     * @param pageNo the page number
+     *
+     * @param jobId    the job id
+     * @param pageNo   the page number
      * @param pageSize the page size
      * @return the job's next page job ids
      */
@@ -295,6 +339,7 @@ public interface JobService {
 
     /**
      * Get the jobs' assignments
+     *
      * @param jobId the job id
      * @return the jobs's assignments
      */
@@ -302,7 +347,8 @@ public interface JobService {
 
     /**
      * Save the job's assignment
-     * @param jobId the job id
+     *
+     * @param jobId     the job id
      * @param clientIps the client ips
      * @return return true if save successfully
      */
@@ -310,9 +356,25 @@ public interface JobService {
 
     /**
      * Get the jobs' simple assignments
+     *
      * @param jobId the job id
      * @return the set
      */
     Response<Set<String>> listSimpleJobAssigns(Long jobId);
 
+    /**
+     * Delete a job's instance
+     *
+     * @param insId instance id
+     * @return the result
+     */
+    Response<Boolean> deleteInstance(Long insId);
+
+    /**
+     * Delete all of the job's instances
+     *
+     * @param jobId the job id
+     * @return return, true if success, otherwise false
+     */
+    Response<Boolean> deleteJobInstances(Long jobId);
 }
